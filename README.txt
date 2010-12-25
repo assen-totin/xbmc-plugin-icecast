@@ -21,8 +21,5 @@ NOTES
 
 3. Some IceCast radio stations obviously feed broken UTF-8 in their names and genres - there's nothing to do about it, complain to the radio station.
 
-
-TODO
-
-1. Write client-side search (as server-side seems unavailable with IceCast).
+4. The client-side search (as server-side seems unavailable with IceCast) searches in both genres and server names
 

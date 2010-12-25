@@ -128,24 +128,44 @@ def addLink(server_name,listen_url,bitrate):
   ok=xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=False)
   return ok
 
-#def keyboard():
-#  kb = xbmc.Keyboard("", __language__(30092), False)
-#  kb.doModal()
-#  if (kb.isConfirmed() and len(kb.getText()) > 2):
-#    doSearch(kb.getText())
+# Get a search query from keyboard
+def readKbd():
+  kb = xbmc.Keyboard("", __language__(30092), False)
+  kb.doModal()
+  if (kb.isConfirmed() and len(kb.getText()) > 2):
+    return kb.getText()
 
-#def doSearch(search):
-#  url = "%s?search=%s" % (BASE_URL, quote_plus(search),)
-#  log("SEARCH URL: %s" % url )
-#  req3 = urllib2.Request(url)
-#  response = urllib2.urlopen(req3)
-#  link = response.read()
-#  response.close()
-#  node = minidom.parseString(link).firstChild
-#  for stat in node.getElementsByTagName('station'):
-#    name = unicodedata.normalize('NFKD',stat.attributes["name"].value).encode('ascii','ignore')
-#    url = "%s?play=%s&tunein=%s" % (sys.argv[0], stat.attributes["id"].value,node.getElementsByTagName('tunein')[0].attributes["base"].value)
-#    addLink(name,url,stat.attributes["br"].value, stat.attributes["lc"].value)
+# Do a search
+def doSearch(dom, query):
+  link_hash = {}
+  entries = dom.getElementsByTagName("entry")
+
+  for entry in entries:
+
+    genre_objects = entry.getElementsByTagName("genre")
+    for genre_object in genre_objects:
+      genre_name = getText(genre_object.childNodes)
+
+    server_name_objects = entry.getElementsByTagName("server_name")
+    for server_name_object in server_name_objects:
+      server_name = getText(server_name_object.childNodes)
+
+    if ((genre_name.find(query) > -1) or (server_name.find(query) > -1)) :
+
+      listen_url_objects = entry.getElementsByTagName("listen_url")
+      for listen_url_object in listen_url_objects:
+        listen_url = getText(listen_url_object.childNodes)
+
+      bitrate_objects = entry.getElementsByTagName("bitrate")
+      for bitrate_object in bitrate_objects:
+        bitrate = getText(bitrate_object.childNodes)
+
+      key = "%s@@@%s" % (server_name, listen_url)
+      link_hash[key] = 1
+
+  for key in sorted(link_hash.keys()):
+    server_name, listen_url = key.split("@@@")
+    addLink(server_name,listen_url,bitrate)
 
 # Play a link
 def playLink(listen_url):
@@ -217,17 +237,19 @@ if igenre > 1 :
   sort()
 
 elif iinitial > 1:
-#  if initial == "search":
-#    keyboard()
-#    sort()
-#  else:
-#    INDEX()
-#    sort(True)
-  xml = readRemoteXML()
-  dom = parseXML(xml)
-  writeLocalXML(xml)
-  buildGenreList(dom)
-  sort(True)
+  if initial == "search":
+    query = readKbd()
+    xml = readRemoteXML()
+    dom = parseXML(xml)
+    writeLocalXML(xml)
+    doSearch(dom, query)
+    sort()
+  else:
+    xml = readRemoteXML()
+    dom = parseXML(xml)
+    writeLocalXML(xml)
+    buildGenreList(dom)
+    sort(True)
          
 elif iplay > 1:
   playLink(play)
@@ -240,5 +262,9 @@ else:
   u = "%s?initial=list" % (sys.argv[0],)
   liz=xbmcgui.ListItem(__language__(30090), iconImage="DefaultFolder.png", thumbnailImage="")
   ok=xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
-  xbmcplugin.endOfDirectory(int(sys.argv[1]))
 
+  u = "%s?initial=search" % (sys.argv[0],)
+  liz=xbmcgui.ListItem(__language__(30091), iconImage="DefaultFolder.png", thumbnailImage="")
+  ok=xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
+
+  xbmcplugin.endOfDirectory(int(sys.argv[1]))
