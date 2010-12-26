@@ -19,13 +19,14 @@
 # *
 # */
 
-import urllib2,string,xbmc,xbmcgui,xbmcplugin, xbmcaddon
+import os, urllib2, string
+import xbmc, xbmcgui, xbmcplugin, xbmcaddon
 from xml.dom import minidom
 from urllib import quote_plus
 import unicodedata
 
 __XBMC_Revision__ = xbmc.getInfoLabel('System.BuildVersion')
-__settings__      = xbmcaddon.Addon(id='plugin.audio.shoutcast')
+__settings__      = xbmcaddon.Addon(id='plugin.audio.icecast')
 __language__      = __settings__.getLocalizedString
 __version__       = __settings__.getAddonInfo('version')
 __cwd__           = __settings__.getAddonInfo('path')
@@ -57,14 +58,20 @@ def parseXML(xml):
 
 # Read the XML file form local cache
 def readLocalXML():
-  f = open('icecast.cache','r')
+  path = xbmc.translatePath(__settings__.getAddonInfo('profile'))
+  cache_file = "%s%s" % (path,'icecast.cache')
+  f = open(cache_file,'rb')
   xml = f.read()
   f.close()
   return xml
 
 # Overwrite the local cache
 def writeLocalXML(xml):
-  f = open('icecast.cache','w')
+  path = xbmc.translatePath(__settings__.getAddonInfo('profile'))
+  try: os.mkdir(path)
+  except: OSError
+  cache_file = "%s%s" % (path,'icecast.cache')
+  f = open(cache_file,'wb')
   f.write(xml)
   f.close()
 
