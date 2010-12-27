@@ -19,7 +19,7 @@
 # *
 # */
 
-import os, urllib2, string
+import os, urllib2, string, re
 import xbmc, xbmcgui, xbmcplugin, xbmcaddon
 from xml.dom import minidom
 from urllib import quote_plus
@@ -32,9 +32,12 @@ __version__       = __settings__.getAddonInfo('version')
 __cwd__           = __settings__.getAddonInfo('path')
 __addonname__    = "Icecast"
 __addonid__      = "plugin.audio.icecast"
-__author__        = "Team XBMC"
+__author__	= "Assen Totin <assen.totin@gmail.com>"
+__credits__        = "Team XBMC"
 
 BASE_URL = 'http://dir.xiph.org/yp.xml'
+
+CACHE_FILE_NAME = 'icecast.cache'
 
 def getText(nodelist):
   rc = []
@@ -42,6 +45,13 @@ def getText(nodelist):
     if node.nodeType == node.TEXT_NODE:
       rc.append(node.data)
   return ''.join(rc)
+
+def getCacheFileName():
+  path = xbmc.translatePath(__settings__.getAddonInfo('profile'))
+  if  not os.path.exists(path):
+    os.makedirs(path)
+  cache_file_name = os.path.join(path,CACHE_FILE_NAME)
+  return cache_file_name
 
 # Read the XML list from IceCast server
 def readRemoteXML():
@@ -58,44 +68,45 @@ def parseXML(xml):
 
 # Read the XML file form local cache
 def readLocalXML():
-  path = xbmc.translatePath(__settings__.getAddonInfo('profile'))
-  cache_file = "%s%s" % (path,'icecast.cache')
-  f = open(cache_file,'rb')
+  cache_file_name = getCacheFileName()
+  f = open(cache_file_name,'rb')
   xml = f.read()
   f.close()
   return xml
 
 # Overwrite the local cache
 def writeLocalXML(xml):
-  path = xbmc.translatePath(__settings__.getAddonInfo('profile'))
-  try: os.mkdir(path)
-  except: OSError
-  cache_file = "%s%s" % (path,'icecast.cache')
-  f = open(cache_file,'wb')
+  cache_file_name = getCacheFileName() 
+  f = open(cache_file_name,'wb')
   f.write(xml)
   f.close()
 
 # Build the list of genres
 def buildGenreList(dom):
-  genre_hash = {'various': 1}
+  genre_hash = {}
   genres = dom.getElementsByTagName("genre")
   for genre in genres:
     genre_name = getText(genre.childNodes)
     for genre_name_single in genre_name.split():
-      genre_hash[genre_name_single] = 1
-  for k in sorted(genre_hash.keys()):
-    addDir(k)
+      if genre_hash.has_key(genre_name_single):
+        genre_hash[genre_name_single] += 1
+      else:
+        genre_hash[genre_name_single] = 1
+  for key in sorted(genre_hash.keys()):
+    addDir(key, genre_hash[key])
 
 # Add a genre to the list
-def addDir(genre_name):
+def addDir(genre_name, count):
   u = "%s?genre=%s" % (sys.argv[0], genre_name,)
-  liz=xbmcgui.ListItem(genre_name, iconImage="DefaultFolder.png", thumbnailImage="")
-  ok=xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
+  genre_name_and_count = "%s (%u streams)" % (genre_name, count)
+  liz = xbmcgui.ListItem(genre_name_and_count, iconImage="DefaultFolder.png", thumbnailImage="")
+  liz.setInfo( type="Music", infoLabels={ "Title": genre_name_and_count,"Size": int(count)} )
+  liz.setProperty("IsPlayable","false");
+  ok = xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
   return ok
 
 # Build list of links in a given genre
 def buildLinkList(dom, genre_name_orig):
-  link_hash = {}
   entries = dom.getElementsByTagName("entry")
 
   for entry in entries:
@@ -116,23 +127,19 @@ def buildLinkList(dom, genre_name_orig):
 
       bitrate_objects = entry.getElementsByTagName("bitrate")
       for bitrate_object in bitrate_objects:
-        bitrate = getText(bitrate_object.childNodes)
+        bitrate_string = getText(bitrate_object.childNodes)
+        bitrate = re.sub('\D','',bitrate_string)
 
-      key = "%s@@@%s" % (server_name, listen_url)
-      link_hash[key] = 1
-
-  for key in sorted(link_hash.keys()):
-    server_name, listen_url = key.split("@@@")
-    addLink(server_name,listen_url,bitrate)
+      addLink(server_name, listen_url, bitrate)
 
 # Add a link inside of a genre list
-def addLink(server_name,listen_url,bitrate):
-  ok=True
+def addLink(server_name, listen_url, bitrate):
+  ok = True
   u = "%s?play=%s" % (sys.argv[0], listen_url,)
-  liz=xbmcgui.ListItem(server_name, iconImage="DefaultVideo.png", thumbnailImage="")
-  liz.setInfo( type="Music", infoLabels={ "Title": server_name ,"Bitrate": bitrate} )
+  liz = xbmcgui.ListItem(server_name, iconImage="DefaultVideo.png", thumbnailImage="")
+  liz.setInfo( type="Music", infoLabels={ "Title": server_name,"Size": int(bitrate)} )
   liz.setProperty("IsPlayable","false");
-  ok=xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=False)
+  ok = xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=False)
   return ok
 
 # Get a search query from keyboard
@@ -144,7 +151,6 @@ def readKbd():
 
 # Do a search
 def doSearch(dom, query):
-  link_hash = {}
   entries = dom.getElementsByTagName("entry")
 
   for entry in entries:
@@ -165,14 +171,10 @@ def doSearch(dom, query):
 
       bitrate_objects = entry.getElementsByTagName("bitrate")
       for bitrate_object in bitrate_objects:
-        bitrate = getText(bitrate_object.childNodes)
+        bitrate_string = getText(bitrate_object.childNodes)
+        bitrate = re.sub('\D','',bitrate_string)
 
-      key = "%s@@@%s" % (server_name, listen_url)
-      link_hash[key] = 1
-
-  for key in sorted(link_hash.keys()):
-    server_name, listen_url = key.split("@@@")
-    addLink(server_name,listen_url,bitrate)
+      addLink(server_name, listen_url, bitrate)
 
 # Play a link
 def playLink(listen_url):
@@ -204,17 +206,11 @@ def log(msg):
 # Sorting
 def sort(dir = False):
   if dir:
-    xbmcplugin.addSortMethod( handle=int( sys.argv[ 1 ] ), sortMethod=xbmcplugin.SORT_METHOD_BITRATE )
     xbmcplugin.addSortMethod( handle=int( sys.argv[ 1 ] ), sortMethod=xbmcplugin.SORT_METHOD_LABEL )
-#    try:
-#      xbmcplugin.addSortMethod( handle=int( sys.argv[ 1 ] ), sortMethod=xbmcplugin.SORT_METHOD_LISTENERS )
-#    except: pass
+    xbmcplugin.addSortMethod( handle=int( sys.argv[ 1 ] ), sortMethod=xbmcplugin.SORT_METHOD_SIZE )
   else:
-    xbmcplugin.addSortMethod( handle=int( sys.argv[ 1 ] ), sortMethod=xbmcplugin.SORT_METHOD_BITRATE, label2Mask="%X" )
     xbmcplugin.addSortMethod( handle=int( sys.argv[ 1 ] ), sortMethod=xbmcplugin.SORT_METHOD_LABEL, label2Mask="%X" )
-#    try:
-#      xbmcplugin.addSortMethod( handle=int( sys.argv[ 1 ] ), sortMethod=xbmcplugin.SORT_METHOD_LISTENERS )
-#    except: pass
+    xbmcplugin.addSortMethod( handle=int( sys.argv[ 1 ] ), sortMethod=xbmcplugin.SORT_METHOD_BITRATE, label2Mask="%X" )
   xbmcplugin.endOfDirectory(int(sys.argv[1]))        
 
 # MAIN 
@@ -251,7 +247,7 @@ elif iinitial > 1:
     writeLocalXML(xml)
     doSearch(dom, query)
     sort()
-  else:
+  elif initial == "list":
     xml = readRemoteXML()
     dom = parseXML(xml)
     writeLocalXML(xml)
@@ -260,10 +256,6 @@ elif iinitial > 1:
          
 elif iplay > 1:
   playLink(play)
-  
-#elif isearch > 1:
-#  doSearch(srch)
-#  sort()
   
 else:
   u = "%s?initial=list" % (sys.argv[0],)
