@@ -16,7 +16,7 @@
 # *
 # */
 
-import os, urllib2, string, re, htmlentitydefs
+import os, urllib2, string, re, htmlentitydefs, time
 from xml.sax.saxutils import unescape
 import xbmc, xbmcgui, xbmcplugin, xbmcaddon
 from xml.dom import minidom
@@ -36,7 +36,28 @@ __credits__        = "Team XBMC"
 BASE_URL = 'http://dir.xiph.org/yp.xml'
 
 CACHE_FILE_NAME = 'icecast.cache'
+TIMESTAMP_FILE_NAME = 'icecast.timestamp'
+TIMESTAMP_THRESHOLD = 86400
 
+DB_FILE_NAME = 'icecasl.sqlite'
+DB_CREATE_TABLE_STATIONS = 'CREATE TABLE stations (server_name VARCHAR(255), listen_url VARCHAR(255), bitrate VARCHAR(255), genre VARCHAR(255));'
+DB_CREATE_TABLE_UPDATES = 'CREATE TABLE updates (unix_timestamp VARCHAR(255));'
+
+# Init function for SQLite
+def initSQLite():
+  sqlite_file_name = getSQLiteFileName()
+  sqlite_con = sqlite.connect(sqlite_file_name)
+  sqlite_cur = sqlite_con.cursor()
+  try:
+    sqlite_cur.execute(DB_CREATE_TABLE_STATIONS)
+    sqlite_cur.execute(DB_CREATE_TABLE_UPDATES)
+    putTimestampSQLite(sqlite_con, sqlite_cur)
+    sqlite_is_empty = 1
+  except:
+    sqlite_is_empty = 0
+  return sqlite_con, sqlite_cur, sqlite_is_empty
+
+# Parse XML line
 def getText(nodelist):
   rc = []
   for node in nodelist:
@@ -44,12 +65,30 @@ def getText(nodelist):
       rc.append(node.data)
   return ''.join(rc)
 
-def getCacheFileName():
+# Obtain the full path of "userdata/add_ons" directory
+def getUserdataDir():
   path = xbmc.translatePath(__settings__.getAddonInfo('profile'))
   if  not os.path.exists(path):
     os.makedirs(path)
-  cache_file_name = os.path.join(path,CACHE_FILE_NAME)
+  return path
+
+# Compose the cache file name
+def getCacheFileName():
+  cache_file_dir = getUserdataDir()
+  cache_file_name = os.path.join(cache_file_dir,CACHE_FILE_NAME)
   return cache_file_name
+
+# Compose the timestamp file name
+def getTimestampFileName():
+  cache_file_dir = getUserdataDir()
+  timestamp_file_name = os.path.join(cache_file_dir,TIMESTAMP_FILE_NAME)
+  return timestamp_file_name
+
+# Compose the SQLite database file anme
+def getSQLiteFileName():
+  cache_file_dir = getUserdataDir()
+  db_file_name = os.path.join(cache_file_dir,DB_FILE_NAME)
+  return db_file_name
 
 # Read the XML list from IceCast server
 def readRemoteXML():
@@ -59,7 +98,7 @@ def readRemoteXML():
   response.close()
   return xml
 
-# Parse XML
+# Parse XML to DOM
 def parseXML(xml):
   dom = minidom.parseString(xml)
   return dom
@@ -79,8 +118,38 @@ def writeLocalXML(xml):
   f.write(xml)
   f.close()
 
-# Build the list of genres
-def buildGenreList(dom):
+# Populate SQLite table
+def DOMtoSQLite(dom, sqlite_con, sqlite_cur):
+  entries = dom.getElementsByTagName("entry")
+  for entry in entries:
+
+    listen_url_objects = entry.getElementsByTagName("listen_url")
+    for listen_url_object in listen_url_objects:
+      listen_url = getText(listen_url_object.childNodes)
+      listen_url = re.sub("'","&apos",listen_url)
+
+    server_name_objects = entry.getElementsByTagName("server_name")
+    for server_name_object in server_name_objects:
+      server_name = getText(server_name_object.childNodes)
+      server_name = re.sub("'","&apos",server_name)
+
+    bitrate_objects = entry.getElementsByTagName("bitrate")
+    for bitrate_object in bitrate_objects:
+      bitrate = getText(bitrate_object.childNodes)
+
+    genre_objects = entry.getElementsByTagName("genre")
+    for genre_object in genre_objects:
+      genre_name = getText(genre_object.childNodes)
+
+      for genre_name_single in genre_name.split():
+        genre_name_single = re.sub("'","&apos",genre_name_single)
+        sql_query = "INSERT INTO stations (server_name, listen_url, bitrate, genre) VALUES ('%s','%s','%s','%s')" % (server_name, listen_url, bitrate, genre_name_single)
+        sqlite_cur.execute(sql_query)
+
+  sqlite_con.commit()
+
+# Build the list of genres from DOM
+def buildGenreListDom(dom):
   genre_hash = {}
   genres = dom.getElementsByTagName("genre")
   for genre in genres:
@@ -92,6 +161,12 @@ def buildGenreList(dom):
         genre_hash[genre_name_single] = 1
   for key in sorted(genre_hash.keys()):
     addDir(key, genre_hash[key])
+
+# Build the list of genres from SQLite
+def buildGenreListSQLite(sqlite_cur):
+  sqlite_cur.execute("SELECT genre, COUNT(*) AS cnt FROM stations GROUP BY genre")
+  for genre, cnt in sqlite_cur: 
+    addDir(genre, cnt)
 
 # Add a genre to the list
 def addDir(genre_name, count):
@@ -105,8 +180,8 @@ def addDir(genre_name, count):
   ok = xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
   return ok
 
-# Build list of links in a given genre
-def buildLinkList(dom, genre_name_orig):
+# Build list of links in a given genre from DOM
+def buildLinkListDom(dom, genre_name_orig):
   entries = dom.getElementsByTagName("entry")
 
   for entry in entries:
@@ -130,6 +205,13 @@ def buildLinkList(dom, genre_name_orig):
         bitrate = getText(bitrate_object.childNodes)
 
       addLink(server_name, listen_url, bitrate)
+
+# Build list of links in a given genre from SQLite
+def buildLinkListSQLite(sqlite_cur, genre_name_orig):
+  sql_query = "SELECT server_name, listen_url, bitrate FROM stations WHERE genre='%s'" % (genre_name_orig)
+  sqlite_cur.execute(sql_query)
+  for server_name, listen_url, bitrate in sqlite_cur:
+    addLink(server_name, listen_url, bitrate)
 
 # Add a link inside of a genre list
 def addLink(server_name, listen_url, bitrate):
@@ -157,8 +239,8 @@ def readKbd():
   if (kb.isConfirmed() and len(kb.getText()) > 2):
     return kb.getText()
 
-# Do a search
-def doSearch(dom, query):
+# Do a search in DOM
+def doSearchDom(dom, query):
   entries = dom.getElementsByTagName("entry")
 
   for entry in entries:
@@ -182,6 +264,14 @@ def doSearch(dom, query):
         bitrate = getText(bitrate_object.childNodes)
 
       addLink(server_name, listen_url, bitrate)
+
+# Do a search in SQLite
+def doSearchSQLite(sqlite_cur, query)
+  sql_query = "SELECT server_name, listen_url, bitrate FROM stations WHERE (genre LIKE '@@@%s@@@') OR (server_name LIKE '@@@%s@@@')" % (query, query)
+  sql_query = re.sub('@@@','%',sql_query)
+  sqlite_cur.execute(sql_query)
+  for server_name, listen_url, bitrate in sqlite_cur:
+    addLink(server_name, listen_url, bitrate)
 
 # Play a link
 def playLink(listen_url):
@@ -209,6 +299,10 @@ def getParams():
 # Logging
 def log(msg):
   xbmc.output("### [%s] - %s" % (__addonname__,msg,),level=xbmc.LOGDEBUG )
+
+# Log NOTICE
+def log_notice(msg):
+  xbmc.output("### [%s] - %s" % (__addonname__,msg,),level=xbmc.LOGNOTICE )
  
 # Sorting
 def sort(dir = False):
@@ -254,13 +348,65 @@ def unescapeXML(text):
     ret = text
   return ret
 
+# Unesacpe wrapper
 def unescapeString(text):
   pass1 = unescapeHTML(text)
   pass2 = unescapeHTML(pass1)
   pass3 = unescapeXML(pass2)
   return pass3
 
+# Functions to read and write unix timestamp to database or file
+def putTimestampSQLite(sqlite_con, sqlite_cur):
+  unix_timestamp = int(time.time())
+  sql_line = "INSERT INTO updates (unix_timestamp) VALUES (%u)" % (unix_timestamp)
+  sqlite_cur.execute(sql_line)
+  sqlite_con.commit()
+
+def putTimestampDom():
+  unix_timestamp = int(time.time())
+  timestamp_file_name = getTimestampFileName()
+  f = open(timestamp_file_name, 'w')
+  f.write(unix_timestamp)
+  f.close()
+
+def getTimestampSQLite(sqlite_cur): 
+  sqlite_cur.execute("SELECT unix_timestamp FROM updates ORDER BY unix_timestamp DESC LIMIT 1")
+  unix_timestamp = sqlite_cur.fetchall()
+  return unix_timestamp
+
+def getTimestampDom():
+  timestamp_file_name = getTimestampFileName()
+  f = open(timestamp_file_name, 'r')
+  unix_timestamp = f.read()
+  f.close()
+  return unix_timestamp
+
+# Timestamp wrappers
+def timestampExpiredSQLite(sqlite_cur):
+  current_unix_timestamp = int(time.time())
+  saved_unix_timestamp = getTimestampSQLite(sqlite_cur)
+  if (current_unix_timestamp - saved_unix_timestamp) > TIMESTAMP_THRESHOLD :
+    return 1
+  return 0
+
+def timestampExpiredDom():
+  current_unix_timestamp = int(time.time())
+  saved_unix_timestamp = getTimestampDom()
+  if (current_unix_timestamp - saved_unix_timestamp) > TIMESTAMP_THRESHOLD :
+    return 1
+  return 0
+
 # MAIN 
+
+# SQLite support - if available
+try:
+  from pysqlite2 import dbapi2 as sqlite
+  use_sqlite = 1
+  log_notice("Using SQLite!")
+except:
+  use_sqlite = 0
+  log_notice("SQLite not found -- reverting to older (and slower) text cache.")
+
 params=getParams()
 
 try:
@@ -281,24 +427,59 @@ iplay = len(play)
 iinitial = len(initial)
 
 if igenre > 1 :
-  xml = readLocalXML()
-  dom = parseXML(xml)
-  buildLinkList(dom, genre)
+  if use_sqlite == 1:
+    sqlite_con, sqlite_cur, sqlite_is_emtpy = initSQLite()
+    timestamp_expired = timestampExpiredSQLite(sqlite_cur)
+    if timestamp_expired == 1:
+      xml = readRemoteXML()
+      dom = parseXML(xml)
+      DOMtoSQLite(dom, sqlite_con, sqlite_cur)
+      putTimestampSQLite(sqlite_con, sqlite_cur)
+    buildLinkListSQLite(sqlite_cur, genre)
+  else :
+    timestamp_expired = timestampExpiredDom()
+    if timestamp_expired == 1:
+      xml = readRemoteXML()
+      writeLocalXML(xml)
+      putTimestampDom()
+    else: 
+      xml = readLocalXML()
+    dom = parseXML(xml)
+    buildLinkListDom(dom, genre)
   sort()
 
 elif iinitial > 1:
+  if use_sqlite == 1:
+    sqlite_con, sqlite_cur, sqlite_is_empty = initSQLite()
+    timestamp_expired = timestampExpiredSQLite(sqlite_cur)
+    if (sqlite_is_empty == 1) or (timestamp_expired == 1):
+      xml = readRemoteXML()  
+      dom = parseXML(xml)
+      DOMtoSQLite(dom, sqlite_con, sqlite_cur)
+      putTimestampSQLite(sqlite_con, sqlite_cur)
+
+  elif use_sqlite == 0:
+    timestamp_expired = timestampExpiredDom()
+    if timestamp_expired == 1:
+      xml = readRemoteXML()
+      writeLocalXML(xml)
+      putTimestampDom()
+    elif timestamp_expired == 0:
+      xml = readLocalXML()
+    dom = parseXML(xml)
+
   if initial == "search":
     query = readKbd()
-    xml = readRemoteXML()
-    dom = parseXML(xml)
-    writeLocalXML(xml)
-    doSearch(dom, query)
+    if use_sqlite == 1:
+      doSearchSQLite(sqlite_cur, query)
+    else:
+      doSearchDom(dom, query)
     sort()
   elif initial == "list":
-    xml = readRemoteXML()
-    dom = parseXML(xml)
-    writeLocalXML(xml)
-    buildGenreList(dom)
+    if use_sqlite == 1:
+      buildGenreListSQLite(sqlite_cur)
+    else:
+      buildGenreListDom(dom)
     sort(True)
          
 elif iplay > 1:
