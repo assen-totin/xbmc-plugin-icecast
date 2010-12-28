@@ -1,7 +1,4 @@
 #/*
-# *      Copyright (C) 2010 Team XBMC
-# *
-# *
 # *  This Program is free software; you can redistribute it and/or modify
 # *  it under the terms of the GNU General Public License as published by
 # *  the Free Software Foundation; either version 2, or (at your option)
@@ -19,7 +16,7 @@
 # *
 # */
 
-import os, urllib2, string, re
+import os, urllib2, string, re, htmlentitydefs
 import xbmc, xbmcgui, xbmcplugin, xbmcaddon
 from xml.dom import minidom
 from urllib import quote_plus
@@ -98,6 +95,9 @@ def buildGenreList(dom):
 # Add a genre to the list
 def addDir(genre_name, count):
   u = "%s?genre=%s" % (sys.argv[0], genre_name,)
+  # Try to unescape HTML-encoding; some strings need two passes - first to convert "&amp;" to "&" and second to unescape "&XYZ;"!
+  genre_name = unescapeHTML(genre_name)
+  genre_name = unescapeHTML(genre_name)
   genre_name_and_count = "%s (%u streams)" % (genre_name, count)
   liz = xbmcgui.ListItem(genre_name_and_count, iconImage="DefaultFolder.png", thumbnailImage="")
   liz.setInfo( type="Music", infoLabels={ "Title": genre_name_and_count,"Size": int(count)} )
@@ -127,17 +127,27 @@ def buildLinkList(dom, genre_name_orig):
 
       bitrate_objects = entry.getElementsByTagName("bitrate")
       for bitrate_object in bitrate_objects:
-        bitrate_string = getText(bitrate_object.childNodes)
-        bitrate = re.sub('\D','',bitrate_string)
+        bitrate = getText(bitrate_object.childNodes)
 
       addLink(server_name, listen_url, bitrate)
 
 # Add a link inside of a genre list
 def addLink(server_name, listen_url, bitrate):
   ok = True
+  # Try to unescape HTML-encoding; some strings need two passes - first to convert "&amp;" to "&" and second to unescape "&XYZ;"!
+  server_name = unescapeHTML(server_name)
+  server_name = unescapeHTML(server_name)
+  listen_url = unescapeHTML(listen_url)
+  listen_url = unescapeHTML(listen_url)
+  # Try to fix all incorrect values for bitrate (remove letters, reset to 0 etc.)
+  bitrate = re.sub('\D','',bitrate)
+  try: 
+    bit = int(bitrate)
+  except:
+    bit = 0
   u = "%s?play=%s" % (sys.argv[0], listen_url,)
   liz = xbmcgui.ListItem(server_name, iconImage="DefaultVideo.png", thumbnailImage="")
-  liz.setInfo( type="Music", infoLabels={ "Title": server_name,"Size": int(bitrate)} )
+  liz.setInfo( type="Music", infoLabels={ "Title": server_name,"Size": bit} )
   liz.setProperty("IsPlayable","false");
   ok = xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=False)
   return ok
@@ -171,8 +181,7 @@ def doSearch(dom, query):
 
       bitrate_objects = entry.getElementsByTagName("bitrate")
       for bitrate_object in bitrate_objects:
-        bitrate_string = getText(bitrate_object.childNodes)
-        bitrate = re.sub('\D','',bitrate_string)
+        bitrate = getText(bitrate_object.childNodes)
 
       addLink(server_name, listen_url, bitrate)
 
@@ -212,6 +221,33 @@ def sort(dir = False):
     xbmcplugin.addSortMethod( handle=int( sys.argv[ 1 ] ), sortMethod=xbmcplugin.SORT_METHOD_LABEL, label2Mask="%X" )
     xbmcplugin.addSortMethod( handle=int( sys.argv[ 1 ] ), sortMethod=xbmcplugin.SORT_METHOD_BITRATE, label2Mask="%X" )
   xbmcplugin.endOfDirectory(int(sys.argv[1]))        
+
+# Unescape escaped HTML characters
+def unescapeHTML(text):
+  def fixup(m):
+    text = m.group(0)
+    if text[:2] == "&#":
+      # character reference
+      try:
+        if text[:3] == "&#x":
+          return unichr(int(text[3:-1], 16))
+        else:
+          return unichr(int(text[2:-1]))
+      except ValueError:
+        pass
+    else:
+      # named entity
+      try:
+        text = unichr(htmlentitydefs.name2codepoint[text[1:-1]])
+      except KeyError:
+        pass
+    return text # leave as is
+  # Try to avoid broken UTF-8
+  try:
+    ret = re.sub("&#?\w+;", fixup, text)
+  except: ret = text
+  #return re.sub("&#?\w+;", fixup, text)
+  return ret
 
 # MAIN 
 params=getParams()
