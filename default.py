@@ -17,6 +17,7 @@
 # */
 
 import os, urllib2, string, re, htmlentitydefs
+from xml.sax.saxutils import unescape
 import xbmc, xbmcgui, xbmcplugin, xbmcaddon
 from xml.dom import minidom
 from urllib import quote_plus
@@ -96,8 +97,7 @@ def buildGenreList(dom):
 def addDir(genre_name, count):
   u = "%s?genre=%s" % (sys.argv[0], genre_name,)
   # Try to unescape HTML-encoding; some strings need two passes - first to convert "&amp;" to "&" and second to unescape "&XYZ;"!
-  genre_name = unescapeHTML(genre_name)
-  genre_name = unescapeHTML(genre_name)
+  genre_name = unescapeString(genre_name)
   genre_name_and_count = "%s (%u streams)" % (genre_name, count)
   liz = xbmcgui.ListItem(genre_name_and_count, iconImage="DefaultFolder.png", thumbnailImage="")
   liz.setInfo( type="Music", infoLabels={ "Title": genre_name_and_count,"Size": int(count)} )
@@ -135,10 +135,8 @@ def buildLinkList(dom, genre_name_orig):
 def addLink(server_name, listen_url, bitrate):
   ok = True
   # Try to unescape HTML-encoding; some strings need two passes - first to convert "&amp;" to "&" and second to unescape "&XYZ;"!
-  server_name = unescapeHTML(server_name)
-  server_name = unescapeHTML(server_name)
-  listen_url = unescapeHTML(listen_url)
-  listen_url = unescapeHTML(listen_url)
+  server_name = unescapeString(server_name)
+  listen_url = unescapeString(listen_url)
   # Try to fix all incorrect values for bitrate (remove letters, reset to 0 etc.)
   bitrate = re.sub('\D','',bitrate)
   try: 
@@ -223,7 +221,6 @@ def sort(dir = False):
   xbmcplugin.endOfDirectory(int(sys.argv[1]))        
 
 # Unescape escaped HTML characters
-# from Fredrik Lundh, http://effbot.org/zone/re-sub.htm#unescape-html
 def unescapeHTML(text):
   def fixup(m):
     text = m.group(0)
@@ -249,6 +246,19 @@ def unescapeHTML(text):
   except: ret = text
   #return re.sub("&#?\w+;", fixup, text)
   return ret
+
+def unescapeXML(text):
+  try:
+    ret = unescape(text, {"&apos;": "'", "&quot;": '"'})
+  except:
+    ret = text
+  return ret
+
+def unescapeString(text):
+  pass1 = unescapeHTML(text)
+  pass2 = unescapeHTML(pass1)
+  pass3 = unescapeXML(pass2)
+  return pass3
 
 # MAIN 
 params=getParams()
