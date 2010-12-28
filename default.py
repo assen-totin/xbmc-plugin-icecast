@@ -223,6 +223,7 @@ def sort(dir = False):
   xbmcplugin.endOfDirectory(int(sys.argv[1]))        
 
 # Unescape escaped HTML characters
+# from Fredrik Lundh, http://effbot.org/zone/re-sub.htm#unescape-html
 def unescapeHTML(text):
   def fixup(m):
     text = m.group(0)
