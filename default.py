@@ -120,6 +120,9 @@ def writeLocalXML(xml):
 
 # Populate SQLite table
 def DOMtoSQLite(dom, sqlite_con, sqlite_cur):
+  sqlite_cur.execute("TRUNCATE TABLE stations")
+  sqlite_con.commit()
+
   entries = dom.getElementsByTagName("entry")
   for entry in entries:
 
