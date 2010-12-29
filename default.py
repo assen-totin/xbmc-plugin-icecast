@@ -339,9 +339,10 @@ def unescapeHTML(text):
     return text # leave as is
   # Try to avoid broken UTF-8
   try:
+    text = unicode(text, 'utf-8')
     ret = re.sub("&#?\w+;", fixup, text)
-  except: ret = text
-  #return re.sub("&#?\w+;", fixup, text)
+  except: 
+    ret = text
   return ret
 
 def unescapeXML(text):
