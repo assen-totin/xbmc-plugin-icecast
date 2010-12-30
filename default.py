@@ -370,7 +370,7 @@ def putTimestampDom():
   unix_timestamp = int(time.time())
   timestamp_file_name = getTimestampFileName()
   f = open(timestamp_file_name, 'w')
-  f.write(unix_timestamp)
+  f.write(str(unix_timestamp))
   f.close()
 
 def getTimestampSQLite(sqlite_cur): 
@@ -381,9 +381,13 @@ def getTimestampSQLite(sqlite_cur):
 
 def getTimestampDom():
   timestamp_file_name = getTimestampFileName()
-  f = open(timestamp_file_name, 'r')
-  unix_timestamp = f.read()
-  f.close()
+  try: 
+    f = open(timestamp_file_name, 'r')
+    unix_timestamp = f.read()
+    f.close()
+    unix_timestamp = int(unix_timestamp)
+  except:
+    unix_timestamp = 0
   return unix_timestamp
 
 # Timestamp wrappers
