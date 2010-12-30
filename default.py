@@ -120,7 +120,7 @@ def writeLocalXML(xml):
 
 # Populate SQLite table
 def DOMtoSQLite(dom, sqlite_con, sqlite_cur):
-  sqlite_cur.execute("TRUNCATE TABLE stations")
+  sqlite_cur.execute("DELETE FROM stations")
   sqlite_con.commit()
 
   entries = dom.getElementsByTagName("entry")
@@ -269,7 +269,7 @@ def doSearchDom(dom, query):
       addLink(server_name, listen_url, bitrate)
 
 # Do a search in SQLite
-def doSearchSQLite(sqlite_cur, query)
+def doSearchSQLite(sqlite_cur, query):
   sql_query = "SELECT server_name, listen_url, bitrate FROM stations WHERE (genre LIKE '@@@%s@@@') OR (server_name LIKE '@@@%s@@@')" % (query, query)
   sql_query = re.sub('@@@','%',sql_query)
   sqlite_cur.execute(sql_query)
@@ -375,8 +375,9 @@ def putTimestampDom():
 
 def getTimestampSQLite(sqlite_cur): 
   sqlite_cur.execute("SELECT unix_timestamp FROM updates ORDER BY unix_timestamp DESC LIMIT 1")
-  unix_timestamp = sqlite_cur.fetchall()
-  return unix_timestamp
+  #unix_timestamp = sqlite_cur.fetchall()
+  for unix_timestamp in sqlite_cur:
+    return int(unix_timestamp[0])
 
 def getTimestampDom():
   timestamp_file_name = getTimestampFileName()
