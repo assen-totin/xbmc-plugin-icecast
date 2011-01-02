@@ -16,12 +16,12 @@
 # *
 # */
 
-import os, urllib2, string, re, htmlentitydefs, time
-from xml.sax.saxutils import unescape
 import xbmc, xbmcgui, xbmcplugin, xbmcaddon
+import os, urllib2, string, re, htmlentitydefs, time, unicodedata
+
+from xml.sax.saxutils import unescape
 from xml.dom import minidom
 from urllib import quote_plus
-import unicodedata
 
 __XBMC_Revision__ = xbmc.getInfoLabel('System.BuildVersion')
 __settings__      = xbmcaddon.Addon(id='plugin.audio.icecast')
