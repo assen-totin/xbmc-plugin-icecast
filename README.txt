@@ -21,7 +21,7 @@ TECHNICAL NOTES
 
 2. To speed up processing and decrease network load (the full IceCast XML is over 3 MB with around 10,000 streams), the add-on sets up a local cache. If SQLite is available (as with standard Ubuntu release), it will be used since it is faster. If SQLite is not available, a text file will be used instead; this is slower, but still better than getting the XML off the Internet every time. The cache is updated if it is more than 1 day old. 
 
-3. Some IceCast radio stations obviously feed broken UTF-8 in their names and genres - there's nothing to do about it, complain to the radio station.
+3. Some IceCast radio stations obviously feed broken UTF-8 in their names and genres - there's nothing to do about it, complain to the radio station. More on the investigation of the issue here: http://bilbo.online.bg/~assen/icecast-addon/unicode.htm
 
 4. The client-side search (as server-side seems unavailable with IceCast) searches in both genres and server names
 
