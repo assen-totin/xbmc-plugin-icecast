@@ -35,6 +35,8 @@ __credits__        = "Team XBMC"
 
 BASE_URL = 'http://dir.xiph.org/yp.xml'
 
+CHUNK_SIZE = 65536
+
 CACHE_FILE_NAME = 'icecast.cache'
 TIMESTAMP_FILE_NAME = 'icecast.timestamp'
 TIMESTAMP_THRESHOLD = 86400
@@ -84,7 +86,7 @@ def getTimestampFileName():
   timestamp_file_name = os.path.join(cache_file_dir,TIMESTAMP_FILE_NAME)
   return timestamp_file_name
 
-# Compose the SQLite database file anme
+# Compose the SQLite database file name
 def getSQLiteFileName():
   cache_file_dir = getUserdataDir()
   db_file_name = os.path.join(cache_file_dir,DB_FILE_NAME)
@@ -92,10 +94,48 @@ def getSQLiteFileName():
 
 # Read the XML list from IceCast server
 def readRemoteXML():
-  req = urllib2.Request(BASE_URL)
-  response = urllib2.urlopen(req)
-  xml = response.read()
+  # Create a dialog
+  global dialog_was_canceled
+  dialog = xbmcgui.DialogProgress()
+  dialog.create(__language__(30093), __language__(30094))
+  dialog.update(1)
+
+  # Download in chunks of CHUNK_SIZE, update the dialog
+  # URL progress bar code taken from triptych (http://stackoverflow.com/users/43089/triptych):
+  # See original code http://stackoverflow.com/questions/2028517/python-urllib2-progress-hook
+  response = urllib2.urlopen(BASE_URL);
+  total_size = response.info().getheader('Content-Length').strip()
+  total_size = int(total_size)
+  bytes_so_far = 0
+  str_list = []
+  xml = ''
+
+  while 1:
+    chunk = response.read(CHUNK_SIZE)
+    bytes_so_far += len(chunk)
+
+    if not chunk: break
+
+    if (dialog.iscanceled()):
+      dialog_was_canceled = 1
+      break
+
+    # There are two a bit fatsre ways to do this: pseudo files (not sure how prtable?) and list comprehensions (lazy about it).
+    # As the performance penalty is not that big, I'll stay with the more straightforward: list + join
+    str_list.append(chunk)
+
+    percent = float(bytes_so_far) / total_size
+    val = int(percent * 100)
+    dialog.update(val)
+
   response.close()
+
+  if dialog_was_canceled == 0:
+    xml = ''.join(str_list)
+    dialog.update(100)
+    time.sleep(1)
+
+  dialog.close
   return xml
 
 # Parse XML to DOM
@@ -435,22 +475,26 @@ igenre = len(genre)
 iplay = len(play)
 iinitial = len(initial)
 
+dialog_was_canceled = 0
+
 if igenre > 1 :
   if use_sqlite == 1:
     sqlite_con, sqlite_cur, sqlite_is_emtpy = initSQLite()
     timestamp_expired = timestampExpiredSQLite(sqlite_cur)
     if timestamp_expired == 1:
       xml = readRemoteXML()
-      dom = parseXML(xml)
-      DOMtoSQLite(dom, sqlite_con, sqlite_cur)
-      putTimestampSQLite(sqlite_con, sqlite_cur)
+      if dialog_was_canceled == 0: 
+        dom = parseXML(xml)
+        DOMtoSQLite(dom, sqlite_con, sqlite_cur)
+        putTimestampSQLite(sqlite_con, sqlite_cur)
     buildLinkListSQLite(sqlite_cur, genre)
   else :
     timestamp_expired = timestampExpiredDom()
     if timestamp_expired == 1:
       xml = readRemoteXML()
-      writeLocalXML(xml)
-      putTimestampDom()
+      if dialog_was_canceled == 0:
+        writeLocalXML(xml)
+        putTimestampDom()
     else: 
       xml = readLocalXML()
     dom = parseXML(xml)
@@ -462,17 +506,19 @@ elif iinitial > 1:
     sqlite_con, sqlite_cur, sqlite_is_empty = initSQLite()
     timestamp_expired = timestampExpiredSQLite(sqlite_cur)
     if (sqlite_is_empty == 1) or (timestamp_expired == 1):
-      xml = readRemoteXML()  
-      dom = parseXML(xml)
-      DOMtoSQLite(dom, sqlite_con, sqlite_cur)
-      putTimestampSQLite(sqlite_con, sqlite_cur)
+      xml = readRemoteXML()
+      if dialog_was_canceled == 0:
+        dom = parseXML(xml)
+        DOMtoSQLite(dom, sqlite_con, sqlite_cur)
+        putTimestampSQLite(sqlite_con, sqlite_cur)
 
   elif use_sqlite == 0:
     timestamp_expired = timestampExpiredDom()
     if timestamp_expired == 1:
       xml = readRemoteXML()
-      writeLocalXML(xml)
-      putTimestampDom()
+      if dialog_was_canceled == 0:
+        writeLocalXML(xml)
+        putTimestampDom()
     elif timestamp_expired == 0:
       xml = readLocalXML()
     dom = parseXML(xml)
