@@ -120,7 +120,7 @@ def readRemoteXML():
       dialog_was_canceled = 1
       break
 
-    # There are two a bit fatsre ways to do this: pseudo files (not sure how prtable?) and list comprehensions (lazy about it).
+    # There are two a bit faster ways to do this: pseudo files (not sure how portable?) and list comprehensions (lazy about it).
     # As the performance penalty is not that big, I'll stay with the more straightforward: list + join
     str_list.append(chunk)
 
@@ -449,12 +449,19 @@ def timestampExpiredDom():
 
 # SQLite support - if available
 try:
-  from pysqlite2 import dbapi2 as sqlite
+  # First, try built-in sqlite in Python 2.5 and newer:
+  from sqlite3 import dbapi2 as sqlite
+  log_notice("Using built-in SQLite via sqlite3!")
   use_sqlite = 1
-  log_notice("Using SQLite!")
 except:
-  use_sqlite = 0
-  log_notice("SQLite not found -- reverting to older (and slower) text cache.")
+  # No luck so far: try the external sqlite
+  try:
+    from pysqlite2 import dbapi2 as sqlite
+    log_notice("Using external SQLite! via pysqlite2")
+    use_sqlite = 1
+  except: 
+    use_sqlite = 0
+    log_notice("SQLite not found -- reverting to older (and slower) text cache.")
 
 params=getParams()
 
