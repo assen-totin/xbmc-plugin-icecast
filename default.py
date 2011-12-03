@@ -457,7 +457,7 @@ except:
   # No luck so far: try the external sqlite
   try:
     from pysqlite2 import dbapi2 as sqlite
-    log_notice("Using external SQLite! via pysqlite2")
+    log_notice("Using external SQLite via pysqlite2!")
     use_sqlite = 1
   except: 
     use_sqlite = 0
