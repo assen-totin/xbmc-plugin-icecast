@@ -341,11 +341,11 @@ def getParams():
 
 # Logging
 def log(msg):
-  xbmc.output("### [%s] - %s" % (__addonname__,msg,),level=xbmc.LOGDEBUG )
+  xbmc.log("### [%s] - %s" % (__addonname__,msg,),level=xbmc.LOGDEBUG )
 
 # Log NOTICE
 def log_notice(msg):
-  xbmc.output("### [%s] - %s" % (__addonname__,msg,),level=xbmc.LOGNOTICE )
+  xbmc.log("### [%s] - %s" % (__addonname__,msg,),level=xbmc.LOGNOTICE )
  
 # Sorting
 def sort(dir = False):
