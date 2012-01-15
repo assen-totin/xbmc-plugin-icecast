@@ -6,4 +6,13 @@
         <string id="30092">Enter station name</string>
         <string id="30093">Updating local cache...</string>
         <string id="30094">Downloading...</string>
+	<string id="30095">Settings</string>
+	<string id="30096">Enable</string>
+	<string id="30097">Disable</string>
+	<string id="30098">Favourites</string>
+	<string id="30099">Add to favourites</string>
+	<string id="30100">Play</string>
+	<string id="30101">Warning</string>
+	<string id="30102">Using favourites requires SQLite</string>
+        <string id="30103">Done</string>
 </strings>

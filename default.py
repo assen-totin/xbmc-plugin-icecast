@@ -1,4 +1,3 @@
-#/*
 # *  This Program is free software; you can redistribute it and/or modify
 # *  it under the terms of the GNU General Public License as published by
 # *  the Free Software Foundation; either version 2, or (at your option)
@@ -41,9 +40,13 @@ CACHE_FILE_NAME = 'icecast.cache'
 TIMESTAMP_FILE_NAME = 'icecast.timestamp'
 TIMESTAMP_THRESHOLD = 86400
 
-DB_FILE_NAME = 'icecasl.sqlite'
+DB_FILE_NAME = 'icecast.sqlite'
 DB_CREATE_TABLE_STATIONS = 'CREATE TABLE stations (server_name VARCHAR(255), listen_url VARCHAR(255), bitrate VARCHAR(255), genre VARCHAR(255));'
+DB_CREATE_TABLE_FAVOURITES = 'CREATE TABLE favourites (server_name VARCHAR(255), listen_url VARCHAR(255), bitrate VARCHAR(255), genre VARCHAR(255));'
+DB_CREATE_TABLE_SETTINGS = 'CREATE TABLE settings (name VARCHAR(255), val VARCHAR(255))'
 DB_CREATE_TABLE_UPDATES = 'CREATE TABLE updates (unix_timestamp VARCHAR(255));'
+DB_CREATE_TABLE_VERSION = 'CREATE TABLE version (version INT);'
+DB_REQUIRED_VERSION = 1 
 
 # Init function for SQLite
 def initSQLite():
@@ -52,12 +55,82 @@ def initSQLite():
   sqlite_cur = sqlite_con.cursor()
   try:
     sqlite_cur.execute(DB_CREATE_TABLE_STATIONS)
+    sqlite_cur.execute(DB_CREATE_TABLE_FAVOURITES)
+    sqlite_cur.execute(DB_CREATE_TABLE_SETTINGS)
     sqlite_cur.execute(DB_CREATE_TABLE_UPDATES)
+    sqlite_cur.execute(DB_CREATE_TABLE_VERSION)
+
+    sql_query = "INSERT INTO version (version) VALUES (%u)" % (DB_REQUIRED_VERSION)
+    sqlite_cur.execute(sql_query)
+
+    sql_query = "INSERT INTO settings (name, val) VALUES ('%s','%s')" % ('30098','0')
+    sqlite_cur.execute(sql_query)
+
     putTimestampSQLite(sqlite_con, sqlite_cur)
+
     sqlite_is_empty = 1
   except:
+    # Check if the database needs upgrade
+    try:
+      version = 0
+      sqlite_cur.execute("SELECT version FROM version")
+      for version in sqlite_cur:
+        if version < DB_REQUIRED_VERSION:
+          upgradeDatabase(version, sqlite_cur)
+    except:
+      # Upgrde from old version that has no 'version' table
+      upgradeDatabase(0, sqlite_cur)
+    
     sqlite_is_empty = 0
   return sqlite_con, sqlite_cur, sqlite_is_empty
+
+# Database upgrade
+def upgradeDatabase(version, sqlite_cur):
+  if version == 0:
+    sqlite_cur.execute(DB_CREATE_TABLE_FAVOURITES)
+    sqlite_cur.execute(DB_CREATE_TABLE_SETTINGS)
+    sqlite_cur.execute(DB_CREATE_TABLE_VERSION)
+    sql_query = "INSERT INTO version (version) VALUES (%u)" % (DB_REQUIRED_VERSION)
+    sqlite_cur.execute(sql_query)
+    sql_query = "INSERT INTO settings (name, val) VALUES ('%s','%s')" % ('30098','0')
+    sqlite_cur.execute(sql_query)
+
+# Show settings menu (SQL version only)
+def showSettings(sqlite_cur):
+  settings_hash = {}
+  val_new = 0
+  txt = ''
+  sqlite_cur.execute("SELECT name, val FROM settings")
+  for name, val in sqlite_cur:
+    settings_hash[name] = val
+
+  # Favourites: 30098
+  if settings_hash.has_key('30098'):
+    if settings_hash['30098'] == '1':
+      txt = "%s %s" % (__language__(30097),__language__(30098))
+      val_new = 0
+    elif settings_hash['30098'] == '0':
+      txt = "%s %s" % (__language__(30096), __language__(30098))
+      val_new = 1
+
+    u = "%s?initial=settings&settings=%s&val=%s" % (sys.argv[0], '30098', val_new)
+    liz = xbmcgui.ListItem(txt, iconImage="DefaultFolder.png", thumbnailImage="")
+    liz.setInfo( type="Music", infoLabels={"Title": txt, "Size": 0} )
+    liz.setProperty("IsPlayable","false");
+    ok = xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
+
+  # 'Done' link
+  u = "%s" % (sys.argv[0])
+  liz = xbmcgui.ListItem(__language__(30103), iconImage="DefaultFolder.png", thumbnailImage="")
+  liz.setInfo( type="Music", infoLabels={"Title": __language__(30103), "Size": 0} )
+  liz.setProperty("IsPlayable","false");
+  ok = xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
+
+  xbmcplugin.endOfDirectory(int(sys.argv[1]))
+
+def updateSettings(sqlite_cur, settings, val):
+  sql_query = "UPDATE settings SET val=%s WHERE name=%s" % (val, settings)
+  sqlite_cur.execute(sql_query)
 
 # Parse XML line
 def getText(nodelist):
@@ -70,7 +143,7 @@ def getText(nodelist):
 # Obtain the full path of "userdata/add_ons" directory
 def getUserdataDir():
   path = xbmc.translatePath(__settings__.getAddonInfo('profile'))
-  if  not os.path.exists(path):
+  if not os.path.exists(path):
     os.makedirs(path)
   return path
 
@@ -213,7 +286,7 @@ def buildGenreListSQLite(sqlite_cur):
 
 # Add a genre to the list
 def addDir(genre_name, count):
-  u = "%s?genre=%s" % (sys.argv[0], genre_name,)
+  u = "%s?genre=%s" % (sys.argv[0], genre_name)
   # Try to unescape HTML-encoding; some strings need two passes - first to convert "&amp;" to "&" and second to unescape "&XYZ;"!
   genre_name = unescapeString(genre_name)
   genre_name_and_count = "%s (%u streams)" % (genre_name, count)
@@ -477,10 +550,19 @@ try:
   play = params["play"]
 except:
   play = "0";
+try:
+  settings = params["settings"]
+except:
+  settings = "0";
+try:
+  val = params["val"]
+except:
+  val = "0";
 
 igenre = len(genre)
 iplay = len(play)
 iinitial = len(initial)
+isettings = len(settings)
 
 dialog_was_canceled = 0
 
@@ -537,12 +619,24 @@ elif iinitial > 1:
     else:
       doSearchDom(dom, query)
     sort()
+
   elif initial == "list":
     if use_sqlite == 1:
       buildGenreListSQLite(sqlite_cur)
     else:
       buildGenreListDom(dom)
     sort(True)
+
+  elif initial == "settings":
+    if use_sqlite == 1:
+      if isettings > 0:
+        updateSettings(sqlite_cur, settings, val)
+      showSettings(sqlite_cur)
+      #sort(True)
+    else:
+      # Show SQLite missing warning
+      dialog = xbmcgui.Dialog()
+      dialog.ok(__language__(30101),__language__(30102))
          
 elif iplay > 1:
   playLink(play)
@@ -554,6 +648,10 @@ else:
 
   u = "%s?initial=search" % (sys.argv[0],)
   liz=xbmcgui.ListItem(__language__(30091), iconImage="DefaultFolder.png", thumbnailImage="")
+  ok=xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
+
+  u = "%s?initial=settings" % (sys.argv[0],)
+  liz=xbmcgui.ListItem(__language__(30095), iconImage="DefaultFolder.png", thumbnailImage="")
   ok=xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
 
   xbmcplugin.endOfDirectory(int(sys.argv[1]))
