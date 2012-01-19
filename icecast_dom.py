@@ -48,11 +48,6 @@ def getTimestampFileName():
   timestamp_file_name = os.path.join(cache_file_dir,TIMESTAMP_FILE_NAME)
   return timestamp_file_name
 
-# Parse XML to DOM
-def parseXML(xml):
-  dom = minidom.parseString(xml)
-  return dom
-
 # Read the XML file form local cache
 def readLocalXML():
   cache_file_name = getCacheFileName()

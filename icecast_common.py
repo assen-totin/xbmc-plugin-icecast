@@ -32,6 +32,11 @@ __addonid__      = "plugin.audio.icecast"
 __author__	= "Assen Totin <assen.totin@gmail.com>"
 __credits__        = "Team XBMC"
 
+# Parse XML to DOM
+def parseXML(xml):
+  dom = minidom.parseString(xml)
+  return dom
+
 # Parse XML line
 def getText(nodelist):
   rc = []
@@ -118,9 +123,9 @@ def addLink(server_name, listen_url, bitrate, from_recent):
   except:
     bit = 0
   if from_recent == 1:
-    u = "%s?play=%s&from_recent=1" % (sys.argv[0], listen_url)
+    u = "%s?mode=play&url==%s&mod_recent=1" % (sys.argv[0], listen_url)
   else :
-    u = "%s?play=%s" % (sys.argv[0], listen_url)
+    u = "%s?mode=play&url=%s" % (sys.argv[0], listen_url)
   liz = xbmcgui.ListItem(server_name, iconImage="DefaultAudio.png", thumbnailImage="")
   liz.setInfo( type="Music", infoLabels={ "Title": server_name,"Size": bit} )
   liz.setProperty("IsPlayable","false");
