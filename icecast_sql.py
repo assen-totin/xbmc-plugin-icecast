@@ -139,7 +139,10 @@ def showFavourites(sqlite_cur):
       u = "%s?mode=favourites&url=%s&fav_action=open" % (sys.argv[0], listen_url)
       liz = xbmcgui.ListItem(server_name, iconImage="DefaultFolder.png", thumbnailImage="")
       xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
-  sort(True)
+  if fav_enabled == 0:
+    sort()
+  else:
+    sort(True)
 
 # Show one favourite
 def showFavourite(sqlite_cur, listen_url):
@@ -156,7 +159,10 @@ def showFavourite(sqlite_cur, listen_url):
       u = "%s?mode=favourites&url=%s&fav_action=remove" % (sys.argv[0], listen_url)
       liz = xbmcgui.ListItem(__language__(30100), iconImage="DefaultAudio.png", thumbnailImage="")
       xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=False)
-    xbmcplugin.endOfDirectory(int(sys.argv[1]))
+  if fav_enabled == 0:
+    sort()
+  else:
+    sortUnsorted()
 
 # Add favourite to DB
 def addFavourite(sqlite_con, sqlite_cur, listen_url):
@@ -186,6 +192,13 @@ def doSearch(sqlite_cur, query):
   sqlite_cur.execute(sql_query)
   for server_name, listen_url, bitrate in sqlite_cur:
     addLink(server_name, listen_url, bitrate, 0)
+
+# Get bitrate by URL
+def getBitrate(sqlite_cur, listen_url):
+  sql_query = "SELECT bitrate FROM stations WHERE listen_url='%s'" % (listen_url)
+  sqlite_cur.execute(sql_query)
+  for bitrate in sqlite_cur:
+    return bitrate[0]
 
 # Functions to read and write unix timestamp to database or file
 def putTimestamp(sqlite_con, sqlite_cur):

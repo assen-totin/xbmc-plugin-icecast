@@ -137,12 +137,14 @@ elif mode == "play":
   if use_sqlite == 1:
     if fav_action == "open":
       # Add a 'play' link
-      addLink(__language__(30101), params["url"], "0", 0)
+      bitrate = getBitrate(sqlite_cur, params["url"])
+      addLink(__language__(30101), params["url"], bitrate, 0)
       # Add a 'add to favourites' link
       u = "%s?mode=favourites&url=%s&fav_action=add" % (sys.argv[0], params["url"])
       liz = xbmcgui.ListItem(__language__(30099), iconImage="DefaultAudio.png", thumbnailImage="")
       xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=False)
-      xbmcplugin.endOfDirectory(int(sys.argv[1]))
+      sortUnsorted()
+      #xbmcplugin.endOfDirectory(int(sys.argv[1]))
     else:
       if mod_recent == 0:
         addRecent(sqlite_con, sqlite_cur, params["url"])

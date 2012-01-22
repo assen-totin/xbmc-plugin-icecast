@@ -109,7 +109,6 @@ def addDir(genre_name, count):
 
 # Add a link inside of a genre list
 def addLink(server_name, listen_url, bitrate, from_recent):
-  ok = True
   # Try to unescape HTML-encoding; some strings need two passes - first to convert "&amp;" to "&" and second to unescape "&XYZ;"!
   server_name = unescapeString(server_name)
   listen_url = unescapeString(listen_url)
@@ -124,10 +123,9 @@ def addLink(server_name, listen_url, bitrate, from_recent):
   else :
     u = "%s?mode=play&url=%s" % (sys.argv[0], listen_url)
   liz = xbmcgui.ListItem(server_name, iconImage="DefaultAudio.png", thumbnailImage="")
-  liz.setInfo( type="Music", infoLabels={ "Title": server_name,"Size": bit} )
+  liz.setInfo(type="Music", infoLabels={ "Title":server_name, "Size":bit})
   liz.setProperty("IsPlayable","false");
-  ok = xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=False)
-  return ok
+  xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=False)
 
 # Get a search query from keyboard
 def readKbd():
@@ -168,14 +166,21 @@ def log_notice(msg):
   xbmc.log("### [%s] - %s" % (__addonname__,msg,),level=xbmc.LOGNOTICE )
  
 # Sorting
-def sort(dir = False):
+def sort(dir=False):
   if dir:
-    xbmcplugin.addSortMethod( handle=int( sys.argv[ 1 ] ), sortMethod=xbmcplugin.SORT_METHOD_LABEL )
-    xbmcplugin.addSortMethod( handle=int( sys.argv[ 1 ] ), sortMethod=xbmcplugin.SORT_METHOD_SIZE )
+    xbmcplugin.addSortMethod(handle=int(sys.argv[1]), sortMethod=xbmcplugin.SORT_METHOD_LABEL)
+    xbmcplugin.addSortMethod(handle=int(sys.argv[1]), sortMethod=xbmcplugin.SORT_METHOD_SIZE)
   else:
-    xbmcplugin.addSortMethod( handle=int( sys.argv[ 1 ] ), sortMethod=xbmcplugin.SORT_METHOD_LABEL, label2Mask="%X" )
-    xbmcplugin.addSortMethod( handle=int( sys.argv[ 1 ] ), sortMethod=xbmcplugin.SORT_METHOD_BITRATE, label2Mask="%X" )
+    xbmcplugin.addSortMethod(handle=int(sys.argv[1]), sortMethod=xbmcplugin.SORT_METHOD_LABEL, label2Mask="%X")
+    xbmcplugin.addSortMethod(handle=int(sys.argv[1]), sortMethod=xbmcplugin.SORT_METHOD_BITRATE, label2Mask="%X")
   xbmcplugin.endOfDirectory(int(sys.argv[1]))        
+
+def sortUnsorted(dir=False):
+  if dir:
+    xbmcplugin.addSortMethod(handle=int(sys.argv[1]), sortMethod=xbmcplugin.SORT_METHOD_UNSORTED)
+  else:
+    xbmcplugin.addSortMethod(handle=int(sys.argv[1]), sortMethod=xbmcplugin.SORT_METHOD_UNSORTED, label2Mask="%X")
+  xbmcplugin.endOfDirectory(int(sys.argv[1]))
 
 # Unescape escaped HTML characters
 def unescapeHTML(text):
