@@ -44,7 +44,7 @@ def showSettings(sqlite_cur, update_listing):
       val_new = 1
 
     u = "%s?mode=settings&setting=%s&val=%s" % (sys.argv[0], '30098', val_new)
-    liz = xbmcgui.ListItem(txt, iconImage="DefaultFolder.png", thumbnailImage="")
+    liz = xbmcgui.ListItem(txt, iconImage="DefaultAddonMusic.png", thumbnailImage="")
     ok = xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
 
   if update_listing == 0:
