@@ -26,7 +26,7 @@ __settings__  = xbmcaddon.Addon(id='plugin.audio.icecast')
 __language__  = __settings__.getLocalizedString
 
 # Show settings menu (SQL version only)
-def showSettings(sqlite_cur):
+def showSettings(sqlite_cur, update_listing):
   settings_hash = {}
   val_new = 0
   txt = ''
@@ -45,18 +45,12 @@ def showSettings(sqlite_cur):
 
     u = "%s?mode=settings&setting=%s&val=%s" % (sys.argv[0], '30098', val_new)
     liz = xbmcgui.ListItem(txt, iconImage="DefaultFolder.png", thumbnailImage="")
-    liz.setInfo( type="Music", infoLabels={"Title": txt, "Size": 0} )
-    liz.setProperty("IsPlayable","false");
     ok = xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
 
-  # 'Done' link
-  u = "%s" % (sys.argv[0])
-  liz = xbmcgui.ListItem(__language__(30103), iconImage="DefaultFolder.png", thumbnailImage="")
-  liz.setInfo( type="Music", infoLabels={"Title": __language__(30103), "Size": 0} )
-  liz.setProperty("IsPlayable","false");
-  ok = xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
-
-  xbmcplugin.endOfDirectory(int(sys.argv[1]))
+  if update_listing == 0:
+    xbmcplugin.endOfDirectory(int(sys.argv[1]))
+  else:
+    xbmcplugin.endOfDirectory(int(sys.argv[1]), updateListing=True)
 
 def updateSettings(sqlite_con, sqlite_cur, settings, val):
   sql_query = "UPDATE settings SET val=%s WHERE name=%s" % (val, settings)
@@ -157,10 +151,10 @@ def showFavourite(sqlite_cur, listen_url):
       addLink(server_name, listen_url, bitrate, 0)
     else:
       # Add a 'play' link
-      addLink(__language__(30100), listen_url, bitrate, 0)
+      addLink(__language__(30101), listen_url, bitrate, 0)
       # Add a 'remove' link
       u = "%s?mode=favourites&url=%s&fav_action=remove" % (sys.argv[0], listen_url)
-      liz = xbmcgui.ListItem(__language__(30101), iconImage="DefaultAudio.png", thumbnailImage="")
+      liz = xbmcgui.ListItem(__language__(30100), iconImage="DefaultAudio.png", thumbnailImage="")
       xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=False)
     xbmcplugin.endOfDirectory(int(sys.argv[1]))
 
@@ -174,12 +168,16 @@ def addFavourite(sqlite_con, sqlite_cur, listen_url):
     sql_query = "INSERT INTO favourites (server_name, listen_url, bitrate, genre) SELECT server_name, listen_url, bitrate, genre FROM stations WHERE listen_url='%s'" % (listen_url)
     sqlite_cur.execute(sql_query)
     sqlite_con.commit()
+  dialog = xbmcgui.Dialog()
+  dialog.ok(__language__(30099), __language__(30102))
 
 # Remove favourite from DB
 def delFavourite(sqlite_con, sqlite_cur, listen_url):
   sql_query = "DELETE FROM favourites WHERE listen_url='%s'" % (listen_url)
   sqlite_cur.execute(sql_query)
   sqlite_con.commit()
+  dialog = xbmcgui.Dialog()
+  dialog.ok(__language__(30100), __language__(30102))
 
 # Do a search in SQLite
 def doSearch(sqlite_cur, query):

@@ -115,7 +115,7 @@ elif mode == "genre":
 elif mode == "settings":
   if setting != 0:
     updateSettings(sqlite_con, sqlite_cur, setting, params["val"])
-  showSettings(sqlite_cur)
+  showSettings(sqlite_cur, setting)
 
 elif mode == "recent":
   showRecent(sqlite_cur)
@@ -126,10 +126,10 @@ elif mode == "favourites":
     showFavourite(sqlite_cur, params["url"])
   elif fav_action == "remove":
     delFavourite(sqlite_con, sqlite_cur, params["url"])
-    showFavourites(sqlite_cur)
+    #showFavourites(sqlite_cur)
   elif fav_action == "add":
     addFavourite(sqlite_con, sqlite_cur, params["url"])
-    showFavourites(sqlite_cur)
+    #showFavourites(sqlite_cur)
   else:
     showFavourites(sqlite_cur)
 
@@ -137,7 +137,7 @@ elif mode == "play":
   if use_sqlite == 1:
     if fav_action == "open":
       # Add a 'play' link
-      addLink(__language__(30100), params["url"], "0", 0)
+      addLink(__language__(30101), params["url"], "0", 0)
       # Add a 'add to favourites' link
       u = "%s?mode=favourites&url=%s&fav_action=add" % (sys.argv[0], params["url"])
       liz = xbmcgui.ListItem(__language__(30099), iconImage="DefaultAudio.png", thumbnailImage="")
@@ -152,7 +152,7 @@ elif mode == "play":
 
 else:
   u = "%s?mode=list" % (sys.argv[0],)
-  liz=xbmcgui.ListItem(__language__(30090), iconImage="DefaultFolder.png", thumbnailImage="")
+  liz=xbmcgui.ListItem(__language__(30090), iconImage="DefaultMusicGenres.png", thumbnailImage="")
   xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
 
   u = "%s?mode=search" % (sys.argv[0],)
@@ -161,15 +161,15 @@ else:
 
   if use_sqlite == 1:
     u = "%s?mode=recent" % (sys.argv[0],)
-    liz=xbmcgui.ListItem(__language__(30104), iconImage="DefaultFolder.png", thumbnailImage="")
+    liz=xbmcgui.ListItem(__language__(30104), iconImage="DefaultMusicRecentlyPlayed.png", thumbnailImage="")
     xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
 
     u = "%s?mode=favourites" % (sys.argv[0],)
-    liz=xbmcgui.ListItem(__language__(30098), iconImage="DefaultFolder.png", thumbnailImage="")
+    liz=xbmcgui.ListItem(__language__(30098), iconImage="DefaultMusicPlaylists.png", thumbnailImage="")
     xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
 
     u = "%s?mode=settings" % (sys.argv[0],)
-    liz=xbmcgui.ListItem(__language__(30095), iconImage="DefaultFolder.png", thumbnailImage="")
+    liz=xbmcgui.ListItem(__language__(30095), iconImage="DefaultAddonMusic.png", thumbnailImage="")
     xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
 
   xbmcplugin.endOfDirectory(int(sys.argv[1]))
