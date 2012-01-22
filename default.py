@@ -15,81 +15,47 @@
 # *
 # */
 
-import xbmc, xbmcgui, xbmcplugin, xbmcaddon
-#import os, urllib2, string, re, htmlentitydefs, time, unicodedata
-
-#from xml.sax.saxutils import unescape
-#from xml.dom import minidom
-#from urllib import quote_plus
+import xbmcgui, xbmcplugin, xbmcaddon
 
 from icecast_common import *
+from icecast_init import *
 
-__XBMC_Revision__ = xbmc.getInfoLabel('System.BuildVersion')
-__settings__      = xbmcaddon.Addon(id='plugin.audio.icecast')
-__language__      = __settings__.getLocalizedString
-__version__       = __settings__.getAddonInfo('version')
-__cwd__           = __settings__.getAddonInfo('path')
-__addonname__    = "Icecast"
-__addonid__      = "plugin.audio.icecast"
-__author__	= "Assen Totin <assen.totin@gmail.com>"
-__credits__        = "Team XBMC"
+__settings__  = xbmcaddon.Addon(id='plugin.audio.icecast')
+__language__  = __settings__.getLocalizedString
+__addonname__ = "Icecast"
+__addonid__   = "plugin.audio.icecast"
+__author__    = "Assen Totin <assen.totin@gmail.com>"
+__credits__   = "Team XBMC"
 
-# SQLite support - if available
-try:
-  # First, try built-in sqlite in Python 2.5 and newer:
-  from sqlite3 import dbapi2 as sqlite
-  log_notice("Using built-in SQLite via sqlite3!")
-  use_sqlite = 1
-except:
-  # No luck so far: try the external sqlite
-  try:
-    from pysqlite2 import dbapi2 as sqlite
-    log_notice("Using external SQLite via pysqlite2!")
-    use_sqlite = 1
-  except: 
-    use_sqlite = 0
-    log_notice("SQLite not found -- reverting to older (and slower) text cache.")
+sqlite_con, sqlite_cur, sqlite_is_empty, use_sqlite = initSQLite()
 
 params=getParams()
 
 try:
-  genre = params["genre"]
-except:
-  genre = "0";
-try:
   mode = params["mode"]
 except:
-  mode = "0";
-try:
-  url = params["url"]
-except:
-  url = "0";
-try:
-  settings = params["settings"]
-except:
-  settings = "0";
-try:
-  val = params["val"]
-except:
-  val = "0";
+  mode = 0
+
 try:
   mod_recent = params["mod_recent"]
 except:
   mod_recent = 0
 
-igenre = len(genre)
-iplay = len(play)
-imode = len(initial)
-isettings = len(settings)
+try:
+  setting = params["setting"]
+except:
+  setting = 0
 
-dialog_was_canceled = 0
+try:
+  fav_action = params["fav_action"]
+except:
+  fav_action = 0
 
 if use_sqlite == 1:
   from icecast_sql import *
-  sqlite_con, sqlite_cur, sqlite_is_empty = initSQLite()
   timestamp_expired = timestampExpired(sqlite_cur)
   if (sqlite_is_empty == 1) or (timestamp_expired == 1):
-    xml = readRemoteXML()
+    xml, dialog_was_canceled = readRemoteXML()
     if dialog_was_canceled == 0:
       dom = parseXML(xml)
       DOMtoSQLite(dom, sqlite_con, sqlite_cur)
@@ -99,7 +65,7 @@ elif use_sqlite == 0:
   from icecast_dom import * 
   timestamp_expired = timestampExpired()
   if timestamp_expired == 1:
-    xml = readRemoteXML()
+    xml, dialog_was_canceled = readRemoteXML()
     if dialog_was_canceled == 0:
       writeLocalXML(xml)
       putTimestamp()
@@ -127,68 +93,84 @@ elif mode == "genre":
   if use_sqlite == 1:
     timestamp_expired = timestampExpired(sqlite_cur)
     if timestamp_expired == 1:
-      xml = readRemoteXML()
+      xml, dialog_was_canceled = readRemoteXML()
       if dialog_was_canceled == 0:
         dom = parseXML(xml)
         DOMtoSQLite(dom, sqlite_con, sqlite_cur)
         putTimestamp(sqlite_con, sqlite_cur)
-    buildLinkList(sqlite_cur, genre)
+    buildLinkList(sqlite_cur, params["genre"])
   else:
     timestamp_expired = timestampExpired()
     if timestamp_expired == 1:
-      xml = readRemoteXML()
+      xml, dialog_was_canceled = readRemoteXML()
       if dialog_was_canceled == 0:
         writeLocalXML(xml)
         putTimestamp()
     else:
       xml = readLocalXML()
     dom = parseXML(xml)
-    buildLinkList(dom, genre)
+    buildLinkList(dom, params["genre"])
   sort()
 
 elif mode == "settings":
-  if use_sqlite == 1:
-    if isettings > 0:
-      updateSettings(sqlite_con, sqlite_cur, settings, val)
-    showSettings(sqlite_cur)
-  else:
-    dialog = xbmcgui.Dialog()
-    dialog.ok(__language__(30101),__language__(30102))
+  if setting != 0:
+    updateSettings(sqlite_con, sqlite_cur, setting, params["val"])
+  showSettings(sqlite_cur)
 
 elif mode == "recent":
-  if use_sqlite == 1:
-    showRecent(sqlite_cur)
-    sort()
+  showRecent(sqlite_cur)
+  sort()
+
+elif mode == "favourites":
+  if fav_action == "open":
+    showFavourite(sqlite_cur, params["url"])
+  elif fav_action == "remove":
+    delFavourite(sqlite_con, sqlite_cur, params["url"])
+    showFavourites(sqlite_cur)
+  elif fav_action == "add":
+    addFavourite(sqlite_con, sqlite_cur, params["url"])
+    showFavourites(sqlite_cur)
   else:
-    dialog = xbmcgui.Dialog()
-    dialog.ok(__language__(30101),__language__(30102))
-         
+    showFavourites(sqlite_cur)
+
 elif mode == "play":
   if use_sqlite == 1:
-    if mod_recent == 0:
-      sqlite_con, sqlite_cur, sqlite_is_empty = initSQLite()
-      unix_timestamp = int(time.time())
-      sql_query = "INSERT INTO recent (server_name,listen_url,bitrate,genre,unix_timestamp) SELECT server_name,listen_url,bitrate,genre,'%s' FROM stations WHERE listen_url='%s' LIMIT 1" % (unix_timestamp, play)
-      sqlite_cur.execute(sql_query)
-      sqlite_con.commit()
-  playLink(play)
-  
+    if fav_action == "open":
+      # Add a 'play' link
+      addLink(__language__(30100), params["url"], "0", 0)
+      # Add a 'add to favourites' link
+      u = "%s?mode=favourites&url=%s&fav_action=add" % (sys.argv[0], params["url"])
+      liz = xbmcgui.ListItem(__language__(30099), iconImage="DefaultAudio.png", thumbnailImage="")
+      xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=False)
+      xbmcplugin.endOfDirectory(int(sys.argv[1]))
+    else:
+      if mod_recent == 0:
+        addRecent(sqlite_con, sqlite_cur, params["url"])
+      playLink(params["url"])
+  else:
+    playLink(params["url"])
+
 else:
   u = "%s?mode=list" % (sys.argv[0],)
   liz=xbmcgui.ListItem(__language__(30090), iconImage="DefaultFolder.png", thumbnailImage="")
-  ok=xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
+  xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
 
   u = "%s?mode=search" % (sys.argv[0],)
   liz=xbmcgui.ListItem(__language__(30091), iconImage="DefaultFolder.png", thumbnailImage="")
-  ok=xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
+  xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
 
-  u = "%s?mode=recent" % (sys.argv[0],)
-  liz=xbmcgui.ListItem(__language__(30104), iconImage="DefaultFolder.png", thumbnailImage="")
-  ok=xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
+  if use_sqlite == 1:
+    u = "%s?mode=recent" % (sys.argv[0],)
+    liz=xbmcgui.ListItem(__language__(30104), iconImage="DefaultFolder.png", thumbnailImage="")
+    xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
 
-  u = "%s?mode=settings" % (sys.argv[0],)
-  liz=xbmcgui.ListItem(__language__(30095), iconImage="DefaultFolder.png", thumbnailImage="")
-  ok=xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
+    u = "%s?mode=favourites" % (sys.argv[0],)
+    liz=xbmcgui.ListItem(__language__(30098), iconImage="DefaultFolder.png", thumbnailImage="")
+    xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
+
+    u = "%s?mode=settings" % (sys.argv[0],)
+    liz=xbmcgui.ListItem(__language__(30095), iconImage="DefaultFolder.png", thumbnailImage="")
+    xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
 
   xbmcplugin.endOfDirectory(int(sys.argv[1]))
 

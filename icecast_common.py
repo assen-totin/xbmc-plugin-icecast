@@ -15,22 +15,20 @@
 # *
 # */
 
-#import xbmc, xbmcgui, xbmcplugin, xbmcaddon
-import os, urllib2, string, re, htmlentitydefs, time, unicodedata
+import xbmc, xbmcgui, xbmcplugin, xbmcaddon
+import os, urllib2
+import re, htmlentitydefs, time, unicodedata, sys
 
 from xml.sax.saxutils import unescape
 from xml.dom import minidom
-from urllib import quote_plus
 
-__XBMC_Revision__ = xbmc.getInfoLabel('System.BuildVersion')
-__settings__      = xbmcaddon.Addon(id='plugin.audio.icecast')
-__language__      = __settings__.getLocalizedString
-__version__       = __settings__.getAddonInfo('version')
-__cwd__           = __settings__.getAddonInfo('path')
-__addonname__    = "Icecast"
-__addonid__      = "plugin.audio.icecast"
-__author__	= "Assen Totin <assen.totin@gmail.com>"
-__credits__        = "Team XBMC"
+__settings__   = xbmcaddon.Addon(id='plugin.audio.icecast')
+__language__   = __settings__.getLocalizedString
+__addonname__  = "Icecast"
+
+TIMESTAMP_THRESHOLD = 86400
+BASE_URL = 'http://dir.xiph.org/yp.xml'
+CHUNK_SIZE = 65536
 
 # Parse XML to DOM
 def parseXML(xml):
@@ -55,7 +53,7 @@ def getUserdataDir():
 # Read the XML list from IceCast server
 def readRemoteXML():
   # Create a dialog
-  global dialog_was_canceled
+  dialog_was_canceled = 0
   dialog = xbmcgui.DialogProgress()
   dialog.create(__language__(30093), __language__(30094))
   dialog.update(1)
@@ -96,19 +94,18 @@ def readRemoteXML():
     time.sleep(1)
 
   dialog.close
-  return xml
+  return xml, dialog_was_canceled
 
 # Add a genre to the list
 def addDir(genre_name, count):
-  u = "%s?genre=%s" % (sys.argv[0], genre_name)
+  u = "%s?mode=genre&genre=%s" % (sys.argv[0], genre_name)
   # Try to unescape HTML-encoding; some strings need two passes - first to convert "&amp;" to "&" and second to unescape "&XYZ;"!
   genre_name = unescapeString(genre_name)
   genre_name_and_count = "%s (%u streams)" % (genre_name, count)
   liz = xbmcgui.ListItem(genre_name_and_count, iconImage="DefaultFolder.png", thumbnailImage="")
   liz.setInfo( type="Music", infoLabels={ "Title": genre_name_and_count,"Size": int(count)} )
   liz.setProperty("IsPlayable","false");
-  ok = xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
-  return ok
+  xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
 
 # Add a link inside of a genre list
 def addLink(server_name, listen_url, bitrate, from_recent):
@@ -123,7 +120,7 @@ def addLink(server_name, listen_url, bitrate, from_recent):
   except:
     bit = 0
   if from_recent == 1:
-    u = "%s?mode=play&url==%s&mod_recent=1" % (sys.argv[0], listen_url)
+    u = "%s?mode=play&url=%s&mod_recent=1" % (sys.argv[0], listen_url)
   else :
     u = "%s?mode=play&url=%s" % (sys.argv[0], listen_url)
   liz = xbmcgui.ListItem(server_name, iconImage="DefaultAudio.png", thumbnailImage="")
@@ -141,7 +138,7 @@ def readKbd():
 
 # Play a link
 def playLink(listen_url):
-  log("PLAY URL: %s" % listen_url )   
+  log("PLAY URL: %s" % listen_url)   
   xbmc.Player().play(listen_url)
 
 # Read command-line parameters

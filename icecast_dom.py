@@ -15,26 +15,14 @@
 # *
 # */
 
-#import xbmc, xbmcgui, xbmcplugin, xbmcaddon
-import os, urllib2, string, re, htmlentitydefs, time, unicodedata
+import os, time
 
-from xml.sax.saxutils import unescape
 from xml.dom import minidom
-from urllib import quote_plus
 
-__XBMC_Revision__ = xbmc.getInfoLabel('System.BuildVersion')
-__settings__      = xbmcaddon.Addon(id='plugin.audio.icecast')
-__language__      = __settings__.getLocalizedString
-__version__       = __settings__.getAddonInfo('version')
-__cwd__           = __settings__.getAddonInfo('path')
-__addonname__    = "Icecast"
-__addonid__      = "plugin.audio.icecast"
-__author__	= "Assen Totin <assen.totin@gmail.com>"
-__credits__        = "Team XBMC"
+from icecast_common import *
 
 CACHE_FILE_NAME = 'icecast.cache'
 TIMESTAMP_FILE_NAME = 'icecast.timestamp'
-TIMESTAMP_THRESHOLD = 86400
 
 # Compose the cache file name
 def getCacheFileName():
@@ -101,7 +89,7 @@ def buildLinkList(dom, genre_name_orig):
       for bitrate_object in bitrate_objects:
         bitrate = getText(bitrate_object.childNodes)
 
-      addLink(server_name, listen_url, bitrate)
+      addLink(server_name, listen_url, bitrate, 0)
 
 # Do a search in DOM
 def doSearch(dom, query):
@@ -127,7 +115,7 @@ def doSearch(dom, query):
       for bitrate_object in bitrate_objects:
         bitrate = getText(bitrate_object.childNodes)
 
-      addLink(server_name, listen_url, bitrate)
+      addLink(server_name, listen_url, bitrate, 0)
 
 # Functions to read and write unix timestamp to database or file
 def putTimestamp():
@@ -151,7 +139,7 @@ def getTimestamp():
 # Timestamp wrappers
 def timestampExpired():
   current_unix_timestamp = int(time.time())
-  saved_unix_timestamp = getTimestampDom()
+  saved_unix_timestamp = getTimestamp()
   if (current_unix_timestamp - saved_unix_timestamp) > TIMESTAMP_THRESHOLD :
     return 1
   return 0
