@@ -126,12 +126,18 @@ elif mode == "favourites":
     showFavourite(sqlite_cur, params["url"])
   elif fav_action == "remove":
     delFavourite(sqlite_con, sqlite_cur, params["url"])
-    #showFavourites(sqlite_cur)
   elif fav_action == "add":
     addFavourite(sqlite_con, sqlite_cur, params["url"])
-    #showFavourites(sqlite_cur)
   else:
-    showFavourites(sqlite_cur)
+    fav_msg = favMessage(sqlite_cur)
+    if fav_msg == 1:
+      dialog = xbmcgui.Dialog()
+      dialog.ok(__language__(30098), __language__(30105))
+    elif fav_msg == 2:
+      dialog = xbmcgui.Dialog()
+      dialog.ok(__language__(30098), __language__(30106))
+    else:
+      showFavourites(sqlite_cur)  
 
 elif mode == "play":
   if use_sqlite == 1:
@@ -166,9 +172,13 @@ else:
     liz=xbmcgui.ListItem(__language__(30104), iconImage="DefaultMusicRecentlyPlayed.png", thumbnailImage="")
     xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
 
-    u = "%s?mode=favourites" % (sys.argv[0],)
+    u = "%s?mode=favourites" % (sys.argv[0])
     liz=xbmcgui.ListItem(__language__(30098), iconImage="DefaultMusicPlaylists.png", thumbnailImage="")
-    xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
+    fav_msg = favMessage(sqlite_cur)
+    if fav_msg == 0:
+      xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
+    else:
+      xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=False)
 
     u = "%s?mode=settings" % (sys.argv[0],)
     liz=xbmcgui.ListItem(__language__(30095), iconImage="DefaultAddonMusic.png", thumbnailImage="")

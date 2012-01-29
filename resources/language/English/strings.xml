@@ -15,4 +15,6 @@
 	<string id="30101">Play</string>
 	<string id="30102">Done</string>
 	<string id="30104">Recently listened stations</string>
+	<string id="30105">To enable adding favourites, go to the Settings</string>
+	<string id="30106">To add a favourite, go to the station and chose Add</string>
 </strings>

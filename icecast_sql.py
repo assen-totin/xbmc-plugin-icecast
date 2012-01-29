@@ -128,6 +128,19 @@ def isFavEnabled(sqlite_cur):
   for val in sqlite_cur:
     return int(val[0])
 
+# Can we show favourites, or shoudl we show a help message?
+def favMessage(sqlite_cur):
+  fav_enabled = isFavEnabled(sqlite_cur)
+  sqlite_cur.execute("SELECT COUNT(*) AS cnt FROM favourites")
+  for cnt in sqlite_cur:
+    counter = int(cnt[0])
+  if (fav_enabled == 0) and (counter == 0):
+    return 1
+  elif (fav_enabled == 1) and (counter == 0):
+    return 2 
+  else:
+    return 0
+
 # Build list of links - favourites
 def showFavourites(sqlite_cur):
   fav_enabled = isFavEnabled(sqlite_cur)
