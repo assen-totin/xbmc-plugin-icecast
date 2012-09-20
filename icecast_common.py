@@ -26,7 +26,7 @@ __settings__   = xbmcaddon.Addon(id='plugin.audio.icecast')
 __language__   = __settings__.getLocalizedString
 __addonname__  = "Icecast"
 
-TIMESTAMP_THRESHOLD = 86400
+TIMESTAMP_THRESHOLD = 604800
 BASE_URL = 'http://dir.xiph.org/yp.xml'
 CHUNK_SIZE = 65536
 
