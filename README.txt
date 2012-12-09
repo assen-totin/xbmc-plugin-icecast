@@ -4,6 +4,7 @@ This is a simple XBMC add-on to listen to IceCast online radio stations.
 
 It is based on the original SHOUTcast add-on. Icecast-specific reserch and coding as well as SQLite support by <assen.totin@gmail.com>
 
+Home page: http://www.zavedil.com/software-xbmc-icecast
 
 INSTALL
 
