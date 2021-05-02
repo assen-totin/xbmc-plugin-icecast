@@ -30,10 +30,6 @@ TIMESTAMP_THRESHOLD = 604800
 BASE_URL = 'http://dir.xiph.org/yp.xml'
 CHUNK_SIZE = 65536
 
-# Define new class to implement HEAD HTTP method
-class HeadRequest(urllib2.Request):
-  def get_method(self):
-    return "HEAD"
 
 # Parse XML to DOM
 def parseXML(xml):
@@ -63,10 +59,6 @@ def readRemoteXML():
   dialog.create(__language__(30093), __language__(30094))
   dialog.update(1)
 
-  # Fetch the uncompressed file size
-  response_size = urllib2.urlopen(HeadRequest(BASE_URL))
-  total_size = response_size.info().getheader('Content-Length')
-  total_size = int(total_size)
 
   # Request gzip'ed download.
   # Download in chunks of CHUNK_SIZE, update the dialog
@@ -74,16 +66,11 @@ def readRemoteXML():
   # See original code http://stackoverflow.com/questions/2028517/python-urllib2-progress-hook
   request = urllib2.Request(BASE_URL)
   request.add_header('Accept-encoding', 'gzip')
-  response = urllib2.urlopen(request);
+  response = urllib2.urlopen(request)
 
   bytes_so_far = 0
   str_list = []
   xml = ''
-
-  # Because apache gzip's on-the-fly, it will not set Content-Length; instead, divide real size by 10.
-  if response.info().get('Content-Encoding') == 'gzip':
-    total_size = int(total_size/10)
-
   while 1:
     chunk = response.read(CHUNK_SIZE)
     bytes_so_far += len(chunk)
@@ -98,11 +85,7 @@ def readRemoteXML():
     # As the performance penalty is not that big, I'll stay with the more straightforward: list + join
     str_list.append(chunk)
 
-    percent = float(bytes_so_far) / total_size
-    val = int(percent * 100)
-    if (val > 99):
-      val = 100
-    dialog.update(val)
+    dialog.update(50)
 
   response.close()
   response_data = ''.join(str_list)
@@ -131,7 +114,7 @@ def addDir(genre_name, count):
   genre_name_and_count = "%s (%u streams)" % (genre_name, count)
   liz = xbmcgui.ListItem(genre_name_and_count, iconImage="DefaultFolder.png", thumbnailImage="")
   liz.setInfo( type="Music", infoLabels={ "Title": genre_name_and_count,"Size": int(count)} )
-  liz.setProperty("IsPlayable","false");
+  liz.setProperty("IsPlayable","false")
   xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=True)
 
 # Add a link inside of a genre list
@@ -140,8 +123,8 @@ def addLink(server_name, listen_url, bitrate, from_recent):
   server_name = unescapeString(server_name)
   listen_url = unescapeString(listen_url)
   # Try to fix all incorrect values for bitrate (remove letters, reset to 0 etc.)
-  bitrate = re.sub('\D','',bitrate)
-  try: 
+  try:
+    bitrate = re.sub('\D','',bitrate)
     bit = int(bitrate)
   except:
     bit = 0
@@ -151,7 +134,7 @@ def addLink(server_name, listen_url, bitrate, from_recent):
     u = "%s?mode=play&url=%s" % (sys.argv[0], listen_url)
   liz = xbmcgui.ListItem(server_name, iconImage="DefaultAudio.png", thumbnailImage="")
   liz.setInfo(type="Music", infoLabels={ "Title":server_name, "Size":bit})
-  liz.setProperty("IsPlayable","false");
+  liz.setProperty("IsPlayable","false")
   xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz,isFolder=False)
 
 # Get a search query from keyboard
@@ -250,5 +233,3 @@ def unescapeString(text):
   pass2 = unescapeHTML(pass1)
   pass3 = unescapeXML(pass2)
   return pass3
-
-
